@@ -1,23 +1,88 @@
-# Implementação de um RISC-V multiciclo
+# RISC-V multiciclo: LEDs com botão
 
-O [código fornecido a você](riscvmulti.sv) nesta simulação é uma implementação multiciclo do RISC-V, adaptada do código de Bruno Levy [^1]. Ele roda, por sua vez, o [programa adaptado do LightRISCV](fibo.asm) [^2] para gravar na memória de dados os primeiros números da sequência de Fibonacci até o limite de 32 bits. 
+Programa em *assembly* que roda no processador RISC-V multiciclo e acende um LED por vez, indo do `Led9` ao `Led0` e voltando. Ao apertar o botão `KEY[1]`, a sequência volta ao início (`Led9`).
 
-Agora usamos o esquema de *von Neumann* (dados e instruções em uma única memória). O código fornecido está praticamente completo, você só precisa pensar nas perguntas abaixo para fornecer os valores corretos nas atribuições faltantes: 
+## Arquivos
 
-```verilog
-    wire writeBackEn = // Quando se escreve no banco de registradores?
-    wire [31:0] writeBackData = // O que se escreve no banco de registradores?
-    wire [31:0] LoadStoreAddress = // Como se calcula o endereço de memória para loads e stores?
-    assign Address = // Qual o endereço de memória a ser acessado? Alternar entre .text e .data dependendo do estado
-    assign MemWrite = // Em que estado se escreve na memória?
-    assign WriteData = // O que se escreve na memória?
+Tudo fica em `aoc/aocaoquadrado`:
+
+| Arquivo | O que é |
+|---|---|
+| `riscvmulti.sv` | Processador RISC-V multiciclo |
+| `top.sv` | SoC: processador, memória e E/S mapeada em memória (LEDs, displays, botões e chaves) |
+| `dec7seg.sv` | Decodificador dos displays de sete segmentos |
+| `tests/mem.sv` | Memória única para instruções e dados |
+| `leds/leds.asm` | Programa dos LEDs |
+| `leds/test.sv` | *Test bench* que imprime a tabela de botão e LEDs no terminal |
+| `leds/run.sh` | Monta o programa e roda a simulação |
+
+Endereços de E/S usados pelo programa:
+
+| Endereço | Dispositivo | Acesso |
+|---|---|---|
+| `0x104` | `LEDR` | escrita (`sw`) |
+| `0x110` | `KEY` | leitura (`lw`) |
+
+## Dependências
+
+Em Linux ou WSL (Ubuntu/Debian):
+
+```sh
+sudo apt update
+sudo apt install iverilog gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf
 ```
 
-Algumas delas recebem um único sinal, outras precisam de uma função lógica entre alguns ou de operadores ternários para decidir entre duas ou mais opções **dependendo do tipo de instrução**. Use o restante do código que já está pronto para obter os valores necessários e **completar esta meia dúzia de linhas**. Você não precisa alterar mais nada além delas, mas fique à vontade se quiser propor algo diferente do que lhe foi dado. 
+## Como rodar a simulação
 
-Nesta simulação, ao invés de olhar para a saída da simulação e comparar com a saída esperada, optou-se por salvar o conteúdo final da memória após a execução. Assim, você pode descomentar e usar livremente o `$monitor` que está no [test bench](tests/testbench.sv) para depurar o seu código. Há também uma opção comentada para salvar o conteúdo do banco de registradores que pode ajudar na depuração do código. 
+```sh
+cd aoc/aocaoquadrado/leds
+sh run.sh
+```
 
-## References
-[^1]: [From Blinker to RISC-V](https://github.com/BrunoLevy/learn-fpga/blob/master/FemtoRV/TUTORIALS/FROM_BLINKER_TO_RISCV/)
-[^2]: [LightRISCV](https://github.com/menotti/LightRISCV)
+O script monta o `leds.asm`, gera o `riscv.hex` (conteúdo da memória) e simula o `top.sv` com o Icarus Verilog.
 
+## Saída esperada
+
+Cada linha é uma escrita nos LEDs. A primeira coluna vale `1` quando o botão está apertado:
+
+```
+botão|Led9|Led8|Led7|Led6|Led5|Led4|Led3|Led2|Led1|Led0|
+0|1|0|0|0|0|0|0|0|0|0|
+0|0|1|0|0|0|0|0|0|0|0|
+0|0|0|1|0|0|0|0|0|0|0|
+0|0|0|0|1|0|0|0|0|0|0|
+0|0|0|0|0|1|0|0|0|0|0|
+0|0|0|0|0|0|1|0|0|0|0|
+0|0|0|0|0|0|0|1|0|0|0|
+0|0|0|0|0|0|0|0|1|0|0|
+0|0|0|0|0|0|0|0|0|1|0|
+0|0|0|0|0|0|0|0|0|0|1|
+0|0|0|0|0|0|0|0|0|1|0|
+0|0|0|0|0|0|0|0|1|0|0|
+0|0|0|0|0|0|0|1|0|0|0|
+0|0|0|0|0|0|1|0|0|0|0|
+0|0|0|0|0|1|0|0|0|0|0|
+0|0|0|0|1|0|0|0|0|0|0|
+1|0|0|1|0|0|0|0|0|0|0|
+0|1|0|0|0|0|0|0|0|0|0|
+0|0|1|0|0|0|0|0|0|0|0|
+...
+```
+
+Na linha com `1` o botão foi apertado, e na linha seguinte a sequência recomeça no `Led9`.
+
+## Ajustes
+
+- **Quando o botão é apertado na simulação:** altere o `wait (escritas == 16)` em `leds/test.sv`.
+- **Qual botão reinicia:** altere a máscara do `andi t2, t2, 2` em `leds/leds.asm` (`2` = `KEY[1]`, `4` = `KEY[2]`, `8` = `KEY[3]`). O `KEY[0]` é o *reset* do processador.
+
+## Na placa (DE0-CV)
+
+O Quartus só usa os arquivos da pasta onde é executado. Depois de rodar a simulação, copie a memória e o programa para `aocaoquadrado` e rode o script de síntese e gravação:
+
+```bat
+cd aoc\aocaoquadrado
+copy tests\mem.sv .
+copy leds\riscv.hex .
+make_wannabe.bat
+```
