@@ -1,0 +1,12 @@
+schema: "classroom50/repo-config/v1"
+classroom: "aoc2026s2"
+assignment: "riscv-multi-lbsb"
+owner:
+  username: "LeonardoCensi"
+  id: 190556506
+  accepted_at: "2026-11-11T17:38:54Z"
+source:
+  owner: "DC-UFSCar"
+  owner_id: 11891488
+  repo: "riscv-multi-lbsb"
+  branch: "main"
